@@ -1,27 +1,97 @@
-CREATE TABLE ZEFA
-(COLI NUMBER(6));
+----------------------------------------
+-- Preparação do ambiente
+----------------------------------------
 
-INSERT INTO ZEFA VALUES (1);
+-- Apagar a tabela EMPR, se existir
+DROP TABLE EMPR PURGE;
 
-COMMIT; --EXEMPLO
+-- Criar e popular a tabela EMPR
+CREATE TABLE EMPR (
+  cd_empr  NUMBER(5) PRIMARY KEY,
+  nm_empr  VARCHAR2(30),
+  vl_sal   NUMBER(9,2),
+  vl_comis NUMBER(9,2),
+  cd_dept  NUMBER(3)
+);
 
---LER A TABELA DESSE USUARIO
-SELECT * FROM PF0844.ZEFA;
+-- Inserindo registros
+INSERT INTO EMPR VALUES (100, 'Pulquéria', 12728.47, NULL, 10);
+INSERT INTO EMPR VALUES (110, 'Alarico',    890.00,   3000, 20);
+INSERT INTO EMPR VALUES (130, 'Absolon',   1200.00,   7000, 30);
+INSERT INTO EMPR VALUES (200, 'Kitty',     9870.22,   NULL, 20);
+COMMIT;
 
---Conceder previlegio
-GRANT SELECT ON ZEFA TO PUBLIC; --Publico
-GRANT SELECT ON ZEFA TO RM558238; --Pessoa especifica
-REVOKE SELECT ON ZEFA FROM PUBLIC; --Revoga o acesso
+----------------------------------------
+-- Função: pega_sal
+----------------------------------------
+CREATE OR REPLACE FUNCTION pega_sal (
+  p_id EMPR.cd_empr%TYPE
+) RETURN NUMBER IS
+  v_sal EMPR.vl_sal%TYPE := 0;
+BEGIN
+  SELECT vl_sal INTO v_sal
+  FROM EMPR
+  WHERE cd_empr = p_id;
 
---PARA GRUPO DE PESSOAS
-CREATE ROLE RH; --CRIAR UM GRUPO
-GRANT SELECT ON ZEFA TO RH; --INSERINDO O GRUPO NA TABELA
-GRANT RH TO RM558238, RM555217; --INSERINDO OS USUARIOS PRO GRUPO
+  RETURN v_sal;
+EXCEPTION
+  WHEN NO_DATA_FOUND THEN
+    RETURN NULL;
+END pega_sal;
+/
+SELECT pega_sal(&Funcionario) FROM DUAL;-- VER O SALARIO DO FUNCIONARIO
 
-SELECT TABLE_NAME FROM USER_TABLES;--TRAZ TODAS TABELAS CRIADAS PELO USUARIO
 
-SELECT SYSDATE FROM DUAL;-- MOSTRAR DATA DE HOJE
+-- Testando a função
+SET SERVEROUTPUT ON
+EXECUTE dbms_output.put_line(pega_sal(100));
 
-SELECT TABLE_NAME FROM ALL_TABLES; --MOSTRA TODAS TABELA QUE FOI CRIADA E TABELAS QUE O USUARIO TEM PERMISSÃO
+VARIABLE b_vl_sal NUMBER
+EXECUTE :b_vl_sal := pega_sal(100);
+PRINT b_vl_sal;
 
-SELECT OWNER, TABLE_NAME FROM ALL_TABLES;-- MOSTRA O PROPRIETARIO DA TABELA
+-- Usando variável local
+DECLARE
+  sal EMPR.vl_sal%TYPE;
+BEGIN
+  sal := pega_sal(100);
+  DBMS_OUTPUT.PUT_LINE('O salário é: ' || sal);
+END;
+/
+
+-- Consulta com função
+SELECT cd_empr, pega_sal(cd_empr) AS salario
+FROM EMPR;
+
+----------------------------------------
+-- Função: taxa
+----------------------------------------
+CREATE OR REPLACE FUNCTION taxa (
+  p_value IN NUMBER
+) RETURN NUMBER IS
+BEGIN
+  RETURN (p_value * 0.08);
+END taxa;
+/
+
+-- Consulta com taxa
+SELECT cd_empr, nm_empr, vl_sal, taxa(vl_sal) AS imposto
+FROM EMPR
+WHERE cd_dept = 10;
+
+----------------------------------------
+-- Função com parâmetros default
+----------------------------------------
+CREATE OR REPLACE FUNCTION f (
+  p_parameter_1 IN NUMBER DEFAULT 1,
+  p_parameter_5 IN NUMBER DEFAULT 5
+) RETURN NUMBER IS
+  v_var NUMBER;
+BEGIN
+  v_var := p_parameter_1 + (p_parameter_5 * 2);
+  RETURN v_var;
+END f;
+/
+
+-- Chamando com notação nomeada
+SELECT f(p_parameter_5 => 10) AS resultado FROM DUAL;
